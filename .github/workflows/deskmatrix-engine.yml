@@ -24,10 +24,14 @@ jobs:
     container: debian:stable-slim
     timeout-minutes: 20
     steps:
+      - name: Install build dependencies in the clean container
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends git ca-certificates cmake build-essential ninja-build \
+            xorg-dev libx11-dev libxtst-dev libssl-dev libxkbfile-dev \
+            qt6-base-dev qt6-tools-dev libxkbregistry-dev libxkbcommon-dev \
+            libei-dev libportal-dev help2man
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/install-dependencies
-        with:
-          like: debian
       - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON
       - run: cmake --build build --target deskflow-core -j2
       - run: cmake -S tests/deskmatrix -B build/status-tests && cmake --build build/status-tests && ctest --test-dir build/status-tests --output-on-failure
