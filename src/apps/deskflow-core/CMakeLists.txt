@@ -10,6 +10,7 @@ add_executable(${target}
   CoreArgs.h
   CoreArgParser.h
   CoreArgParser.cpp
+  ManagedStatusQuery.h
 )
 
 if(WIN32)

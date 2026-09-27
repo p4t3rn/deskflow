@@ -7,6 +7,7 @@
  */
 
 #include "CoreArgParser.h"
+#include "ManagedStatusQuery.h"
 
 #include "arch/Arch.h"
 #include "base/EventQueue.h"
@@ -22,6 +23,7 @@
 #endif
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QSharedMemory>
 #include <QTextStream>
@@ -69,6 +71,19 @@ App *createApp(const CoreArgParser &parser, EventQueue &events, const QString &p
 
 int main(int argc, char **argv)
 {
+  // A status query must work without a graphical session and must not initialize
+  // the input backend, shared-memory lock, or persistent settings.
+  for (int i = 1; i < argc; ++i) {
+    if (QString::fromLocal8Bit(argv[i]) == QStringLiteral("--status-json")) {
+      QCoreApplication queryApp(argc, argv);
+      const CoreArgParser parser(QCoreApplication::arguments());
+      if (!parser.errorText().isEmpty()) {
+        QTextStream(stderr) << parser.errorText() << '\n';
+        return s_exitArgs;
+      }
+      return queryManagedStatus();
+    }
+  }
 #if defined(Q_OS_WIN)
   ArchMiscWindows::setInstanceWin32(GetModuleHandle(nullptr));
 #endif
@@ -86,7 +101,8 @@ int main(int argc, char **argv)
 
   // Print any parser errors
   if (!parser.errorText().isEmpty()) {
-    QTextStream(stdout) << parser.errorText() << "\n";
+    QTextStream(stderr) << parser.errorText() << "\n";
+    return s_exitArgs;
   }
 
   if (parser.help()) {
@@ -98,6 +114,9 @@ int main(int argc, char **argv)
     QTextStream(stdout) << parser.versionText();
     return s_exitSuccess;
   }
+
+  if (parser.statusJson())
+    return queryManagedStatus();
 
   // Before we check any more args we need to check for a duplicate process.
   // Create a shared memory segment with a unique key
@@ -121,7 +140,8 @@ int main(int argc, char **argv)
 
   App *coreApp = createApp(parser, events, processName);
 
-  const auto ipcServer = new deskflow::core::ipc::CoreIpcServer(&app); // NOSONAR - Qt managed
+  const auto role = parser.serverMode() ? QStringLiteral("server") : QStringLiteral("client");
+  const auto ipcServer = new deskflow::core::ipc::CoreIpcServer(&app, role); // NOSONAR - Qt managed
   QObject::connect(
       ipcServer, &deskflow::core::ipc::IpcServer::stopProcessRequested, coreApp, &App::quit, Qt::DirectConnection
   );

@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: (C) 2026 DeskMatrix contributors
+# SPDX-License-Identifier: MIT
+name: DeskMatrix engine development checks
+on:
+  push:
+    branches: [codex/deskmatrix-managed-engine]
+permissions:
+  contents: read
+jobs:
+  status-model:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          cache: true
+      - run: cmake -S tests/deskmatrix -B build/status-tests
+      - run: cmake --build build/status-tests --config Release
+      - run: ctest --test-dir build/status-tests -C Release --output-on-failure
+  core-build:
+    runs-on: ubuntu-latest
+    container: debian:stable-slim
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/install-dependencies
+        with:
+          like: debian
+      - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON
+      - run: cmake --build build --target deskflow-core -j2
+      - run: cmake -S tests/deskmatrix -B build/status-tests && cmake --build build/status-tests && ctest --test-dir build/status-tests --output-on-failure
+      - name: Read-only status fails closed without a running engine
+        shell: bash
+        run: |
+          set +e
+          QT_QPA_PLATFORM=minimal build/bin/deskflow-core --status-json >status.json 2>status.err
+          result=$?
+          set -e
+          test "$result" -eq 1
+          test ! -s status.json
+          grep -q 'IPC unavailable' status.err

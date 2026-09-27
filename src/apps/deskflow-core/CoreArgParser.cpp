@@ -88,6 +88,11 @@ bool CoreArgParser::version() const
   return m_parser.isSet(CoreArgs::versionOption);
 }
 
+bool CoreArgParser::statusJson() const
+{
+  return m_parser.isSet(CoreArgs::statusOption);
+}
+
 bool CoreArgParser::serverMode() const
 {
   return m_serverMode;

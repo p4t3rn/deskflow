@@ -19,6 +19,8 @@ struct CoreArgs
       QCommandLineOption("new-instance", "Skip the check for a running instance, always makes a new instance");
   inline static const auto configOption =
       QCommandLineOption({"s", "settings"}, "override configuration file to use", "configFile");
+  inline static const auto statusOption =
+      QCommandLineOption("status-json", "Query the running DeskMatrix engine over local IPC (read-only)");
 
-  inline static const auto options = {helpOption, versionOption, multiInstanceOption, configOption};
+  inline static const auto options = {helpOption, versionOption, multiInstanceOption, configOption, statusOption};
 };

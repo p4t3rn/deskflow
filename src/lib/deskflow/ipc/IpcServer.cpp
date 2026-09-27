@@ -52,6 +52,7 @@ void IpcServer::handleNewConnection()
 
   LOG_DEBUG("%s ipc server got new connection", m_typeName.constData());
   m_clients.insert(clientSocket);
+  clientSocket->setReadBufferSize(65537);
 
   connect(clientSocket, &QLocalSocket::readyRead, this, &IpcServer::handleReadyRead);
   connect(clientSocket, &QLocalSocket::disconnected, this, &IpcServer::handleDisconnected);
@@ -63,26 +64,18 @@ void IpcServer::handleReadyRead()
   const auto clientSocket = qobject_cast<QLocalSocket *>(sender());
   LOG_VERBOSE("%s ipc server ready to read data", m_typeName.constData());
 
-  QByteArray data = clientSocket->readAll();
-  if (data.isEmpty()) {
-    LOG_WARN("%s ipc server got empty message", m_typeName.constData());
-    return;
+  // QLocalSocket is a stream: keep partial lines buffered until the next read.
+  // Bound each command so an untrusted local client cannot grow memory forever.
+  while (clientSocket->canReadLine()) {
+    const auto line = clientSocket->readLine(65537);
+    if (!line.endsWith('\n')) {
+      clientSocket->abort();
+      return;
+    }
+    processMessage(clientSocket, QString::fromUtf8(line.chopped(1)));
   }
-
-  // we don't handle incomplete messages yet; each socket read must have delimiters.
-  if (!data.contains('\n')) {
-    LOG_WARN("%s ipc server got incomplete message: %s", m_typeName.constData(), data.constData());
-    return;
-  }
-
-  // each message is delimited by a newline to keep the protocol super simple.
-  while (data.contains('\n')) {
-    const auto index = data.indexOf('\n');
-    QByteArray messageData = data.left(index);
-    data.remove(0, index + 1);
-    QString message = QString::fromUtf8(messageData);
-    processMessage(clientSocket, message);
-  }
+  if (clientSocket->bytesAvailable() > 65536)
+    clientSocket->abort();
 }
 
 void IpcServer::handleDisconnected()

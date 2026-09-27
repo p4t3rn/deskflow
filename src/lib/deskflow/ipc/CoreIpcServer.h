@@ -7,6 +7,7 @@
 #pragma once
 
 #include "IpcServer.h"
+#include "ManagedStatus.h"
 
 #include <QObject>
 #include <QSet>
@@ -20,12 +21,16 @@ class CoreIpcServer : public IpcServer
   Q_OBJECT
 
 public:
-  explicit CoreIpcServer(QObject *parent);
+  explicit CoreIpcServer(QObject *parent, const QString &role = QStringLiteral("unknown"));
+
+  void broadcastCommand(const QString &command, const QString &args = "") override;
 
   static CoreIpcServer &instance();
 
 private:
   void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) override;
+  QString m_role;
+  ManagedStatus m_status;
 };
 
 } // namespace deskflow::core::ipc

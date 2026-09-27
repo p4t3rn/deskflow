@@ -31,6 +31,7 @@ public:
   QString errorText() const;
   bool help() const;
   bool version() const;
+  bool statusJson() const;
   bool serverMode() const;
   bool clientMode() const;
   bool singleInstanceOnly() const;
