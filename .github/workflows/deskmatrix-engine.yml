@@ -66,6 +66,18 @@ jobs:
       - uses: actions/checkout@v6
       - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON
       - run: cmake --build build --target deskflow-core -j2
+      - name: Managed certificate initialization is private and idempotent
+        shell: bash
+        run: |
+          pem="$RUNNER_TEMP/deskmatrix identity/tls/identity.pem"
+          QT_QPA_PLATFORM=minimal build/bin/deskflow-core --ensure-certificate "$pem" >certificate-created.json
+          grep -Eq '"created":true' certificate-created.json
+          grep -Eq '"fingerprintSha256":"[0-9a-f]{64}"' certificate-created.json
+          test "$(stat -c '%a' "$pem")" = 600
+          QT_QPA_PLATFORM=minimal build/bin/deskflow-core --ensure-certificate "$pem" >certificate-existing.json
+          grep -Eq '"created":false' certificate-existing.json
+          test "$(sed -n 's/.*"fingerprintSha256":"\([0-9a-f]*\)".*/\1/p' certificate-created.json)" = \
+            "$(sed -n 's/.*"fingerprintSha256":"\([0-9a-f]*\)".*/\1/p' certificate-existing.json)"
       - run: cmake -S tests/deskmatrix -B build/status-tests && cmake --build build/status-tests && ctest --test-dir build/status-tests --output-on-failure
       - name: Read-only status fails closed without a running engine
         shell: bash

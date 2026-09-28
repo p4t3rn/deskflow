@@ -28,9 +28,12 @@ struct CoreArgs
       QCommandLineOption("request-id", "Correlation ID for a managed command", "requestId");
   inline static const auto managedSingleDisplayOption =
       QCommandLineOption("managed-single-display", "Lock all cursor edges and accept only explicit target switching");
+  inline static const auto ensureCertificateOption = QCommandLineOption(
+      "ensure-certificate", "Create or inspect a managed TLS identity and print its public fingerprint", "pemPath"
+  );
 
-  inline static const auto options = {helpOption,          versionOption,
-                                      multiInstanceOption, configOption,
-                                      statusOption,        switchTargetOption,
-                                      requestIdOption,     managedSingleDisplayOption};
+  inline static const auto options = {
+      helpOption,         versionOption,   multiInstanceOption,        configOption,           statusOption,
+      switchTargetOption, requestIdOption, managedSingleDisplayOption, ensureCertificateOption
+  };
 };

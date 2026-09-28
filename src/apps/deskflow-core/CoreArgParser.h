@@ -36,6 +36,8 @@ public:
   QString switchTarget() const;
   QString requestId() const;
   bool managedSingleDisplay() const;
+  bool ensureCertificateRequested() const;
+  QString certificatePath() const;
   bool serverMode() const;
   bool clientMode() const;
   bool singleInstanceOnly() const;

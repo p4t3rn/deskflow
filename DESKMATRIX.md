@@ -47,6 +47,19 @@ The core IPC socket now uses the current-user ACL. The legacy system daemon keep
 upstream cross-account access contract separately. This local IPC is still not a
 remote authentication API and must never be exposed over TCP.
 
+## Managed TLS identity primitive
+
+`deskflow-core --ensure-certificate <absolute-pem-path>` creates a 2048-bit local
+self-signed identity only when the path is absent, restricts the PEM to its owner,
+validates both certificate and private key, and prints schema-1 JSON containing only
+the public SHA-256 fingerprint and whether a file was created. It rejects relative
+paths, symbolic links, invalid existing files and combinations with IPC commands.
+It never overwrites or exports a private key.
+
+This command does not trust a peer. DeskMatrix still needs an authenticated,
+user-visible fingerprint approval and revocation flow before Agent lifecycle code may
+populate `trusted-servers` or `trusted-clients` and mark an engine generation active.
+
 ## Existing launch format
 
 Use `deskflow-core server --settings <INI>` or `deskflow-core client --settings <INI>`.
@@ -58,8 +71,8 @@ peer checks to make onboarding appear successful.
 
 ## Not implemented / not release-ready
 
-Dedicated engine namespace; authenticated configuration sync; certificate enrollment
-and rotation; managed lifecycle; signed Windows distribution; packaged Agent/Web
+Dedicated engine namespace; peer certificate approval, revocation and rotation;
+managed lifecycle; signed Windows distribution; packaged Agent/Web
 consumption; Windows/macOS end-to-end input acceptance. The IPC name is still shared
 with the upstream GUI and needs a dedicated namespace before release.
 

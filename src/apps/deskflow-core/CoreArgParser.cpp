@@ -113,6 +113,16 @@ bool CoreArgParser::managedSingleDisplay() const
   return m_parser.isSet(CoreArgs::managedSingleDisplayOption);
 }
 
+bool CoreArgParser::ensureCertificateRequested() const
+{
+  return m_parser.isSet(CoreArgs::ensureCertificateOption);
+}
+
+QString CoreArgParser::certificatePath() const
+{
+  return m_parser.value(CoreArgs::ensureCertificateOption);
+}
+
 bool CoreArgParser::serverMode() const
 {
   return m_serverMode;

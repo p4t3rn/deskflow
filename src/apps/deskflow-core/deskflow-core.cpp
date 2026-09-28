@@ -7,6 +7,7 @@
  */
 
 #include "CoreArgParser.h"
+#include "ManagedCertificate.h"
 #include "ManagedStatusQuery.h"
 
 #include "arch/Arch.h"
@@ -76,12 +77,20 @@ int main(int argc, char **argv)
   for (int i = 1; i < argc; ++i) {
     const auto arg = QString::fromLocal8Bit(argv[i]);
     if (arg == QStringLiteral("--status-json") || arg == QStringLiteral("--switch-target") ||
+        arg == QStringLiteral("--ensure-certificate") || arg.startsWith(QStringLiteral("--ensure-certificate=")) ||
         arg.startsWith(QStringLiteral("--switch-target="))) {
       QCoreApplication queryApp(argc, argv);
       const CoreArgParser parser(QCoreApplication::arguments());
       if (!parser.errorText().isEmpty()) {
         QTextStream(stderr) << parser.errorText() << '\n';
         return s_exitArgs;
+      }
+      if (parser.ensureCertificateRequested()) {
+        if (parser.statusJson() || parser.switchTargetRequested()) {
+          QTextStream(stderr) << "certificate initialization cannot be combined with IPC commands\n";
+          return s_exitArgs;
+        }
+        return ensureManagedCertificate(parser.certificatePath());
       }
       if (parser.switchTargetRequested())
         return requestManagedTarget(parser.switchTarget(), parser.requestId());
