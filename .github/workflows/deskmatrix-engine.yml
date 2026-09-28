@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 jobs:
+  format:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/lint-clang
   status-model:
     runs-on: windows-2022
     timeout-minutes: 15
@@ -19,6 +25,32 @@ jobs:
       - run: cmake -S tests/deskmatrix -B build/status-tests
       - run: cmake --build build/status-tests --config Release
       - run: ctest --test-dir build/status-tests -C Release --output-on-failure
+  windows-core-build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: amd64
+          spectre: true
+      - id: dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: 6.11.3
+          vcpkg-triplet: x64-windows-release
+      - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON ${{ steps.dependencies.outputs.vcpkg-cmake-config }}
+      - run: cmake --build build --config Release --target deskflow-core -j2
+  macos-core-build:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: 6.11.3
+      - run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DBUILD_OSX_BUNDLE=OFF -DSKIP_BUILD_TESTS=ON
+      - run: cmake --build build --config Release --target deskflow-core -j2
   core-build:
     runs-on: ubuntu-latest
     container: debian:stable-slim
