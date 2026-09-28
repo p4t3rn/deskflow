@@ -15,6 +15,7 @@
 #include "server/Config.h"
 
 #include <memory>
+#include <utility>
 
 enum class ServerState
 {
@@ -45,7 +46,20 @@ class ServerApp : public App
   using ServerConfig = deskflow::server::Config;
 
 public:
-  explicit ServerApp(IEventQueue *events, const QString &processName = QString());
+  class ManagedSwitchTargetInfo : public EventData
+  {
+  public:
+    ManagedSwitchTargetInfo(std::string requestId, std::string target)
+        : m_requestId(std::move(requestId)),
+          m_target(std::move(target))
+    {
+    }
+
+    std::string m_requestId;
+    std::string m_target;
+  };
+
+  explicit ServerApp(IEventQueue *events, const QString &processName = QString(), bool managedSingleDisplay = false);
   ~ServerApp() override = default;
 
   //
@@ -102,7 +116,8 @@ public:
   }
 
 private:
-  void handleScreenSwitched() const;
+  void handleScreenSwitched(const Event &event) const;
+  void handleManagedSwitchTarget(const Event &event) const;
   std::unique_ptr<ISocketFactory> getSocketFactory() const;
   NetworkAddress getAddress(const NetworkAddress &address) const;
 
@@ -116,4 +131,5 @@ private:
   NetworkAddress *m_deskflowAddress = nullptr;
   std::string m_name;
   std::shared_ptr<deskflow::server::Config> m_config;
+  bool m_managedSingleDisplay = false;
 };

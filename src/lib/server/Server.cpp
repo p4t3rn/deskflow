@@ -1324,6 +1324,10 @@ void Server::handleSwitchToScreenEvent(const Event &event)
 
 void Server::handleSwitchInDirectionEvent(const Event &event)
 {
+  if (m_managedSingleDisplay) {
+    LOG_WARN("ignoring directional switch in managed single-display mode");
+    return;
+  }
   const auto *info = static_cast<SwitchInDirectionInfo *>(event.getData());
 
   // jump to screen in chosen direction from center of this screen
@@ -1339,6 +1343,10 @@ void Server::handleSwitchInDirectionEvent(const Event &event)
 
 void Server::handleToggleScreenEvent(const Event &)
 {
+  if (m_managedSingleDisplay) {
+    LOG_WARN("ignoring toggle switch in managed single-display mode");
+    return;
+  }
   // Get the list of connected screens in config order
   std::vector<std::string> screens;
   getClients(screens);
@@ -1408,6 +1416,11 @@ void Server::handleLockCursorToScreenEvent(const Event &event)
 {
   const auto *info = static_cast<LockCursorToScreenInfo *>(event.getData());
 
+  if (m_managedSingleDisplay && info->m_state != LockCursorToScreenInfo::kOn) {
+    LOG_WARN("ignoring cursor unlock in managed single-display mode");
+    return;
+  }
+
   // choose new state
   bool newState;
   switch (info->m_state) {
@@ -1434,6 +1447,52 @@ void Server::handleLockCursorToScreenEvent(const Event &event)
     if (!isLockedToScreenServer()) {
       stopRelativeMoves();
     }
+  }
+}
+
+void Server::enableManagedSingleDisplayMode()
+{
+  m_managedSingleDisplay = true;
+  m_disableLockToScreen = false;
+  m_defaultLockToScreenState = true;
+  m_lockedToScreen = true;
+  m_primaryClient->reconfigure(getActivePrimarySides());
+  ipcSendToClient(QStringLiteral("topologyProfile"), QStringLiteral("shared-single-display-v1"));
+  ipcSendToClient(QStringLiteral("cursorLocked"), QStringLiteral("true"));
+  ipcSendToClient(QStringLiteral("activeScreen"), QString::fromStdString(getName(m_active)));
+}
+
+void Server::requestManagedSwitchTarget(const std::string &requestId, const std::string &screen)
+{
+  const auto request = QString::fromStdString(requestId);
+  const auto target = QString::fromStdString(screen);
+  const auto active = [this] { return QString::fromStdString(getName(m_active)); };
+  if (!m_managedSingleDisplay) {
+    ipcSendManagedTargetResult(
+        request, target, QStringLiteral("rejected"), active(), QStringLiteral("managed single-display mode is disabled")
+    );
+    return;
+  }
+
+  const auto client = m_clients.find(screen);
+  if (client == m_clients.end()) {
+    ipcSendManagedTargetResult(
+        request, target, QStringLiteral("rejected"), active(), QStringLiteral("target is not connected")
+    );
+    return;
+  }
+
+  m_lockedToScreen = true;
+  m_primaryClient->reconfigure(getActivePrimarySides());
+  ipcSendToClient(QStringLiteral("cursorLocked"), QStringLiteral("true"));
+  jumpToScreen(client->second);
+  const auto applied = active();
+  if (applied == target) {
+    ipcSendManagedTargetResult(request, target, QStringLiteral("applied"), applied);
+  } else {
+    ipcSendManagedTargetResult(
+        request, target, QStringLiteral("rejected"), applied, QStringLiteral("engine did not activate the target")
+    );
   }
 }
 

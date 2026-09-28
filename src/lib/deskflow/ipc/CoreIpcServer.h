@@ -27,7 +27,14 @@ public:
 
   static CoreIpcServer &instance();
 
+Q_SIGNALS:
+  void managedSwitchTargetRequested(const QString &requestId, const QString &target);
+
 private:
+  void writeManagedTargetResult(
+      QLocalSocket *clientSocket, const QString &requestId, const QString &target, const QString &state,
+      const QString &error = QString()
+  );
   void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) override;
   QString m_role;
   ManagedStatus m_status;

@@ -77,6 +77,11 @@ public:
     std::string m_screen;
   };
 
+  //! Enable DeskMatrix's one-visible-display safety contract.
+  void enableManagedSingleDisplayMode();
+  //! Switch only to an explicit connected target and publish a correlated result.
+  void requestManagedSwitchTarget(const std::string &requestId, const std::string &screen);
+
   //! Switch in direction data
   class SwitchInDirectionInfo : public EventData
   {
@@ -467,5 +472,6 @@ private:
 
   bool m_defaultLockToScreenState = false;
   bool m_disableLockToScreen = false;
+  bool m_managedSingleDisplay = false;
   bool m_enableClipboard = true;
 };

@@ -14,11 +14,12 @@
 
 namespace deskflow::core::ipc {
 
-IpcServer::IpcServer(QObject *parent, const QString &serverName, const QString &typeName)
+IpcServer::IpcServer(QObject *parent, const QString &serverName, const QString &typeName, bool allowWorldAccess)
     : QObject(parent),
       m_server{new QLocalServer(this)}, // NOSONAR - Qt memory
       m_serverName(serverName),
-      m_typeName(typeName.toUtf8())
+      m_typeName(typeName.toUtf8()),
+      m_allowWorldAccess(allowWorldAccess)
 {
   // do nothing
 }
@@ -30,8 +31,10 @@ IpcServer::~IpcServer()
 
 void IpcServer::listen()
 {
-  // IPC server normally runs as system, but GUI runs as regular user, so we need to allow world access.
-  m_server->setSocketOptions(QLocalServer::WorldAccessOption);
+  // The input engine runs in the interactive user's session. Its control IPC
+  // must not be writable by every local account. The system daemon opts into
+  // world access separately for its legacy cross-account GUI contract.
+  m_server->setSocketOptions(m_allowWorldAccess ? QLocalServer::WorldAccessOption : QLocalServer::UserAccessOption);
 
   connect(m_server, &QLocalServer::newConnection, this, &IpcServer::handleNewConnection);
   QLocalServer::removeServer(m_serverName);

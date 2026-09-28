@@ -62,7 +62,7 @@ void showHelp(const CoreArgParser &parser)
 App *createApp(const CoreArgParser &parser, EventQueue &events, const QString &processName)
 {
   if (parser.serverMode()) {
-    return new ServerApp(&events, processName);
+    return new ServerApp(&events, processName, parser.managedSingleDisplay());
   } else if (parser.clientMode()) {
     return new ClientApp(&events, processName);
   }
@@ -74,13 +74,17 @@ int main(int argc, char **argv)
   // A status query must work without a graphical session and must not initialize
   // the input backend, shared-memory lock, or persistent settings.
   for (int i = 1; i < argc; ++i) {
-    if (QString::fromLocal8Bit(argv[i]) == QStringLiteral("--status-json")) {
+    const auto arg = QString::fromLocal8Bit(argv[i]);
+    if (arg == QStringLiteral("--status-json") || arg == QStringLiteral("--switch-target") ||
+        arg.startsWith(QStringLiteral("--switch-target="))) {
       QCoreApplication queryApp(argc, argv);
       const CoreArgParser parser(QCoreApplication::arguments());
       if (!parser.errorText().isEmpty()) {
         QTextStream(stderr) << parser.errorText() << '\n';
         return s_exitArgs;
       }
+      if (parser.switchTargetRequested())
+        return requestManagedTarget(parser.switchTarget(), parser.requestId());
       return queryManagedStatus();
     }
   }
@@ -117,6 +121,8 @@ int main(int argc, char **argv)
 
   if (parser.statusJson())
     return queryManagedStatus();
+  if (parser.switchTargetRequested())
+    return requestManagedTarget(parser.switchTarget(), parser.requestId());
 
   // Before we check any more args we need to check for a duplicate process.
   // Create a shared memory segment with a unique key
@@ -144,6 +150,15 @@ int main(int argc, char **argv)
   const auto ipcServer = new deskflow::core::ipc::CoreIpcServer(&app, role); // NOSONAR - Qt managed
   QObject::connect(
       ipcServer, &deskflow::core::ipc::IpcServer::stopProcessRequested, coreApp, &App::quit, Qt::DirectConnection
+  );
+  QObject::connect(
+      ipcServer, &deskflow::core::ipc::CoreIpcServer::managedSwitchTargetRequested, &app,
+      [&events](const QString &requestId, const QString &target) {
+        events.addEvent(Event(
+            EventTypes::ServerAppManagedSwitchTarget, events.getSystemTarget(),
+            new ServerApp::ManagedSwitchTargetInfo(requestId.toStdString(), target.toStdString())
+        ));
+      }
   );
   ipcServer->listen();
 

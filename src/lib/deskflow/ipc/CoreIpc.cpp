@@ -8,6 +8,8 @@
 
 #include "CoreIpcServer.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMetaEnum>
 
 void ipcSendToClient(const QString &command, const QString &args)
@@ -25,4 +27,23 @@ void ipcSendConnectionState(deskflow::core::ConnectionState state)
 {
   const auto metaEnum = QMetaEnum::fromType<deskflow::core::ConnectionState>();
   ipcSendToClient(QStringLiteral("connectionState"), metaEnum.valueToKey(static_cast<int>(state)));
+}
+
+void ipcSendManagedTargetResult(
+    const QString &requestId, const QString &target, const QString &state, const QString &activeTarget,
+    const QString &error
+)
+{
+  QJsonObject result{
+      {QStringLiteral("requestId"), requestId},
+      {QStringLiteral("target"), target},
+      {QStringLiteral("state"), state},
+  };
+  if (!activeTarget.isEmpty())
+    result.insert(QStringLiteral("activeTarget"), activeTarget);
+  if (!error.isEmpty())
+    result.insert(QStringLiteral("error"), error);
+  ipcSendToClient(
+      QStringLiteral("managedTargetResult"), QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact))
+  );
 }

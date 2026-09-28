@@ -19,12 +19,16 @@ private Q_SLOTS:
   {
     ManagedStatus status;
     const auto json = status.snapshot("server", "test-version", 123);
-    QCOMPARE(json.value("schemaVersion").toInt(), 1);
+    QCOMPARE(json.value("schemaVersion").toInt(), 2);
     QCOMPARE(json.value("engine").toString(), "deskmatrix-deskflow");
     QCOMPARE(json.value("connectionState").toString(), "Starting");
     QCOMPARE(json.value("role").toString(), "server");
     QCOMPARE(json.value("pid").toInteger(), 123);
     QVERIFY(json.value("connectedClients").toArray().isEmpty());
+    QCOMPARE(json.value("topologyProfile").toString(), "unknown");
+    QVERIFY(json.value("activeTarget").isNull());
+    QCOMPARE(json.value("cursorLocked").toBool(), false);
+    QVERIFY(json.value("lastCommand").isNull());
   }
 
   void listeningIsNotConnected()
@@ -58,6 +62,25 @@ private Q_SLOTS:
     QCOMPARE(QJsonDocument::fromJson(QJsonDocument(json).toJson()).object(), json);
     status.observe("connectedClients", "");
     QVERIFY(status.snapshot("server", "v", 1).value("connectedClients").toArray().isEmpty());
+  }
+
+  void managedSingleDisplayStateIsMachineReadable()
+  {
+    ManagedStatus status;
+    status.observe("topologyProfile", "shared-single-display-v1");
+    status.observe("cursorLocked", "true");
+    status.observe("activeScreen", "mac-mini");
+    status.observe(
+        "managedTargetResult",
+        R"({"requestId":"scene-42","target":"mac-mini","state":"applied","activeTarget":"mac-mini"})"
+    );
+    const auto json = status.snapshot("server", "v", 1);
+    QCOMPARE(json.value("topologyProfile").toString(), "shared-single-display-v1");
+    QCOMPARE(json.value("cursorLocked").toBool(), true);
+    QCOMPARE(json.value("activeTarget").toString(), "mac-mini");
+    const auto command = json.value("lastCommand").toObject();
+    QCOMPARE(command.value("requestId").toString(), "scene-42");
+    QCOMPARE(command.value("state").toString(), "applied");
   }
 };
 

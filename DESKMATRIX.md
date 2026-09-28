@@ -8,7 +8,7 @@ This is not yet a packaged or validated replacement for Deskflow.
 Keep upstream copyright, GPLv2 and the OpenSSL exception with redistributed binaries
 and provide corresponding source for the exact distributed revision.
 
-## Read-only status contract, schema 1
+## Managed status contract, schema 2
 
 `deskflow-core --status-json` queries the running fork over local IPC. It does not
 start another engine, change settings, accept certificates or inject input.
@@ -16,7 +16,8 @@ Exit 0 means a compatible JSON response was received; nonzero means unavailable,
 incompatible, timed out or invalid arguments. Errors go to stderr.
 
 The JSON contains `schemaVersion`, `engine`, `version`, `pid`, `role`,
-`connectionState` and `connectedClients`. States come from upstream engine events:
+`connectionState`, `connectedClients`, `topologyProfile`, `activeTarget`,
+`cursorLocked` and `lastCommand`. States come from upstream engine events:
 Starting / Connecting / Listening / Connected / Disconnected. Server peer names
 come from upstream's comma-delimited connectedClients event; screen names containing
 commas are not supported by that upstream event format. Listening is not Connected.
@@ -27,6 +28,24 @@ The new IPC request is `deskmatrixStatus\n`, returning
 `deskmatrixStatus=<compact JSON>\n`. The status snapshot survives other clients
 consuming the historical broadcast queue. Stream reads preserve partial lines and
 reject oversized requests. Status replies never contain credentials or private keys.
+
+## Managed single-display target switching
+
+Start the server with `--managed-single-display`. This locks all four cursor edges,
+rejects directional/toggle switching, and identifies the running profile as
+`shared-single-display-v1`. It is intended for several computers sharing one visible
+physical monitor, not a continuously visible multi-monitor desktop.
+
+`deskflow-core --switch-target <screen> --request-id <id>` sends a bounded local IPC
+request. Exit 0 is returned only after the running server reports the same request ID,
+target and active target with state `applied`. Missing/disconnected targets, wrong
+roles, non-managed servers, incompatible replies and timeouts fail closed. Target and
+request identifiers are restricted to a small non-whitespace character set. Agent
+commands should use this interface instead of injecting Deskflow hotkeys.
+
+The core IPC socket now uses the current-user ACL. The legacy system daemon keeps its
+upstream cross-account access contract separately. This local IPC is still not a
+remote authentication API and must never be exposed over TCP.
 
 ## Existing launch format
 
@@ -39,11 +58,10 @@ peer checks to make onboarding appear successful.
 
 ## Not implemented / not release-ready
 
-Dedicated engine namespace and user-only IPC ACL; authenticated configuration sync;
-certificate enrollment and rotation; managed lifecycle; signed Windows distribution;
-Agent/Web consumption of this status; Windows/macOS end-to-end input acceptance.
-The existing upstream IPC socket is shared with the GUI and retains upstream ACLs;
-it is not a new remotely authenticated control API. Do not expose it over a network.
+Dedicated engine namespace; authenticated configuration sync; certificate enrollment
+and rotation; managed lifecycle; signed Windows distribution; packaged Agent/Web
+consumption; Windows/macOS end-to-end input acceptance. The IPC name is still shared
+with the upstream GUI and needs a dedicated namespace before release.
 
 Standalone status model tests: `cmake -S tests/deskmatrix -B build/status-tests`,
 then build and run CTest. These do not replace a full core build or IPC integration test.

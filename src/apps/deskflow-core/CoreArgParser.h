@@ -32,6 +32,10 @@ public:
   bool help() const;
   bool version() const;
   bool statusJson() const;
+  bool switchTargetRequested() const;
+  QString switchTarget() const;
+  QString requestId() const;
+  bool managedSingleDisplay() const;
   bool serverMode() const;
   bool clientMode() const;
   bool singleInstanceOnly() const;

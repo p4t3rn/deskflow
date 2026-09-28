@@ -55,7 +55,9 @@ using namespace deskflow::server;
 // ServerApp
 //
 
-ServerApp::ServerApp(IEventQueue *events, const QString &processName) : App(events, processName)
+ServerApp::ServerApp(IEventQueue *events, const QString &processName, bool managedSingleDisplay)
+    : App(events, processName),
+      m_managedSingleDisplay(managedSingleDisplay)
 {
   m_name = Settings::value(Settings::Core::ComputerName).toString().toStdString();
   // do nothing
@@ -463,7 +465,13 @@ Server *ServerApp::openServer(ServerConfig &config, PrimaryClient *primaryClient
 {
   auto *server = new Server(config, primaryClient, m_serverScreen, getEvents());
   try {
-    getEvents()->addHandler(EventTypes::ServerScreenSwitched, server, [this](const auto &) { handleScreenSwitched(); });
+    getEvents()->addHandler(EventTypes::ServerScreenSwitched, server, [this](const auto &event) {
+      handleScreenSwitched(event);
+    });
+    if (m_managedSingleDisplay)
+      server->enableManagedSingleDisplayMode();
+    else
+      ipcSendToClient(QStringLiteral("topologyProfile"), QStringLiteral("upstream-default"));
 
   } catch (std::bad_alloc &ba) {
     delete server;
@@ -473,9 +481,23 @@ Server *ServerApp::openServer(ServerConfig &config, PrimaryClient *primaryClient
   return server;
 }
 
-void ServerApp::handleScreenSwitched() const
+void ServerApp::handleScreenSwitched(const Event &event) const
 {
-  // do nothing
+  const auto *info = static_cast<Server::SwitchToScreenInfo *>(event.getData());
+  ipcSendToClient(QStringLiteral("activeScreen"), QString::fromStdString(info->m_screen));
+}
+
+void ServerApp::handleManagedSwitchTarget(const Event &event) const
+{
+  const auto *info = static_cast<ManagedSwitchTargetInfo *>(event.getData());
+  if (m_server == nullptr) {
+    ipcSendManagedTargetResult(
+        QString::fromStdString(info->m_requestId), QString::fromStdString(info->m_target), QStringLiteral("rejected"),
+        QString(), QStringLiteral("server is not ready")
+    );
+    return;
+  }
+  m_server->requestManagedSwitchTarget(info->m_requestId, info->m_target);
 }
 
 std::unique_ptr<ISocketFactory> ServerApp::getSocketFactory() const
@@ -515,6 +537,13 @@ int ServerApp::mainLoop()
     return s_exitFailed;
   }
 
+  // Register the management command before starting the server. IPC starts on
+  // the Qt thread first, so an early request must be queued rather than lost.
+  getEvents()->addHandler(
+      EventTypes::ServerAppManagedSwitchTarget, getEvents()->getSystemTarget(),
+      [this](const auto &event) { handleManagedSwitchTarget(event); }
+  );
+
   // start server, etc
   try {
     startNode();
@@ -536,7 +565,6 @@ int ServerApp::mainLoop()
   getEvents()->addHandler(EventTypes::ServerAppForceReconnect, getEvents()->getSystemTarget(), [this](const auto &) {
     forceReconnect();
   });
-
   // to work around the sticky meta keys problem, we'll give users
   // the option to reset the state of the server.
   getEvents()->addHandler(EventTypes::ServerAppResetServer, getEvents()->getSystemTarget(), [this](const auto &) {
@@ -552,6 +580,7 @@ int ServerApp::mainLoop()
   LOG_DEBUG("stopping server");
   getEvents()->removeHandler(EventTypes::ServerAppForceReconnect, getEvents()->getSystemTarget());
   getEvents()->removeHandler(EventTypes::ServerAppReloadConfig, getEvents()->getSystemTarget());
+  getEvents()->removeHandler(EventTypes::ServerAppManagedSwitchTarget, getEvents()->getSystemTarget());
   cleanupServer();
   LOG_INFO("stopped server");
 

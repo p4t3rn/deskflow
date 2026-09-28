@@ -12,3 +12,7 @@
 
 void ipcSendToClient(const QString &command, const QString &args = "");
 void ipcSendConnectionState(deskflow::core::ConnectionState state);
+void ipcSendManagedTargetResult(
+    const QString &requestId, const QString &target, const QString &state, const QString &activeTarget = QString(),
+    const QString &error = QString()
+);

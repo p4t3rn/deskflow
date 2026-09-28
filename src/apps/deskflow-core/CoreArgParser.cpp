@@ -93,6 +93,26 @@ bool CoreArgParser::statusJson() const
   return m_parser.isSet(CoreArgs::statusOption);
 }
 
+bool CoreArgParser::switchTargetRequested() const
+{
+  return m_parser.isSet(CoreArgs::switchTargetOption);
+}
+
+QString CoreArgParser::switchTarget() const
+{
+  return m_parser.value(CoreArgs::switchTargetOption);
+}
+
+QString CoreArgParser::requestId() const
+{
+  return m_parser.value(CoreArgs::requestIdOption);
+}
+
+bool CoreArgParser::managedSingleDisplay() const
+{
+  return m_parser.isSet(CoreArgs::managedSingleDisplayOption);
+}
+
 bool CoreArgParser::serverMode() const
 {
   return m_serverMode;
